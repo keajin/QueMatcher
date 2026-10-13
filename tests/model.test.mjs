@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, availablePlayers, movePlayer, startMatch, endMatch, reorderMatch, normalizeSetup } from '../src/model.js';
+import { createSession, availablePlayers, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, startMatch, endMatch, reorderMatch, normalizeSetup } from '../src/model.js';
 
 function fixture() {
   const session = createSession();
@@ -8,6 +8,59 @@ function fixture() {
   session.queue = [{ id: 'first', players: ['a', 'b', 'c', 'd'] }, { id: 'second', players: [null, null, null, null] }];
   return session;
 }
+
+test('card drops fill the first gap and transfer a queued player without duplication', () => {
+  const session = fixture();
+  session.queue[1].players = [null, 'e', null, null];
+  addPlayerToMatch(session, 'a', 'second');
+  assert.deepEqual(session.queue[1].players, ['a', 'e', null, null]);
+  assert.equal(session.queue[0].players[0], null);
+  const before = structuredClone(session);
+  addPlayerToMatch(session, 'a', 'second');
+  assert.deepEqual(session, before);
+});
+
+test('full card drops leave all previous assignments intact', () => {
+  const session = fixture();
+  const before = structuredClone(session);
+  assert.throws(() => addPlayerToMatch(session, 'e', 'first'), /already has 4/);
+  assert.deepEqual(session, before);
+});
+
+test('quick placement chooses the earliest gap before later queued matches', () => {
+  const session = fixture();
+  movePlayer(session, 'b');
+  queueAvailablePlayer(session, 'e');
+  assert.deepEqual(session.queue[0].players, ['a', 'e', 'c', 'd']);
+  assert.deepEqual(session.queue[1].players, [null, null, null, null]);
+});
+
+test('quick placement creates a match when none exist or every match is full', () => {
+  for (const hasFullMatch of [false, true]) {
+    const session = fixture();
+    session.queue = hasFullMatch ? [session.queue[0]] : [];
+    queueAvailablePlayer(session, 'e');
+    assert.equal(session.queue.length, hasFullMatch ? 2 : 1);
+    assert.deepEqual(session.queue.at(-1).players, ['e', null, null, null]);
+    const before = structuredClone(session);
+    assert.throws(() => queueAvailablePlayer(session, 'e'), /available list/);
+    assert.deepEqual(session, before);
+  }
+});
+
+test('leaving removes only available attendance and blocks queued or live players', () => {
+  const session = fixture();
+  removeAvailablePlayer(session, 'e');
+  assert.deepEqual(session.attending, ['a', 'b', 'c', 'd']);
+  const before = structuredClone(session);
+  assert.throws(() => removeAvailablePlayer(session, 'a'), /Only available/);
+  assert.deepEqual(session, before);
+  startMatch(session, 'court');
+  const liveBefore = structuredClone(session);
+  assert.throws(() => removeAvailablePlayer(session, 'a'), /Only available/);
+  assert.throws(() => addPlayerToMatch(session, 'a', 'second'), /Only available/);
+  assert.deepEqual(session, liveBefore);
+});
 
 test('moving a plate removes its old assignment; replacing returns the displaced player', () => {
   const session = fixture();

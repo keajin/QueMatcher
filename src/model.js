@@ -29,6 +29,31 @@ export function movePlayer(session, playerId, matchId = null, slot = null) {
   if (target) target.players[slot] = playerId;
 }
 
+export function addPlayerToMatch(session, playerId, matchId) {
+  if (!session.attending.includes(playerId) || isLive(session, playerId)) throw new Error('Only available or queued players can be moved.');
+  const match = session.queue.find(item => item.id === matchId);
+  if (!match) throw new Error('Choose a queued match.');
+  if (match.players.includes(playerId)) return;
+  const slot = match.players.findIndex(id => id === null);
+  if (slot < 0) throw new Error('This match already has 4 players. Choose another queue card.');
+  movePlayer(session, playerId, matchId, slot);
+}
+
+export function queueAvailablePlayer(session, playerId) {
+  if (!availablePlayers(session).includes(playerId)) throw new Error('Choose a player from the available list.');
+  let match = session.queue.find(item => item.players.includes(null));
+  if (!match) {
+    match = { id: uid(), players: [null, null, null, null] };
+    session.queue.push(match);
+  }
+  addPlayerToMatch(session, playerId, match.id);
+}
+
+export function removeAvailablePlayer(session, playerId) {
+  if (!availablePlayers(session).includes(playerId)) throw new Error('Only available players can leave the session.');
+  session.attending = session.attending.filter(id => id !== playerId);
+}
+
 export function startMatch(session, courtId, now = Date.now()) {
   if (session.live[courtId]) throw new Error('This court is already playing.');
   const next = session.queue[0];

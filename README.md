@@ -37,17 +37,30 @@ The installed app works entirely offline without accounts or external services. 
 
 **Closing the app clears the session.** A confirmation pop-up warns you before the queue, attendance, active matches, and timers are removed. Your saved roster and courts are kept.
 
+## Appearance and layout
+
+- Use the arrow at the top of the sidebar to collapse or expand navigation.
+- Use **Dark mode** or **Light mode** in the top bar to switch themes. The initial theme follows the computer's appearance setting.
+- The sidebar and theme preferences are remembered locally between launches.
+- Courts and queued matches use matching vertical cards named **Court 1**, **Queue 1**, and so on, with four players listed in one column. Queue numbers reflect the current order.
+- Player name plates use solid skill colors and larger, bold names. Long names wrap to stay readable.
+- A court lights up for **10 seconds** when a match starts, then returns to its normal playing appearance.
+
 ## Workflow
 
 1. In **Roster & courts**, save players with one of five skill colors and add numbered courts. Court numbers are unique positive whole numbers.
 2. On **Session board**, use **Select attendance** to check in today's players.
-3. **Add Match** creates four empty queue slots. Drag players into them. Moving a player removes their previous assignment; dropping onto an occupied slot returns its previous player to available.
+3. **Add Match** creates four empty queue slots. Drag a player anywhere onto a queue card to fill its first empty slot from the top. Moving a player removes their previous assignment. Full cards reject drops without replacing anyone.
 4. Drag a match's handle to reorder the shared queue. Move up/down buttons also change the order.
 5. An empty court's **Next Match** starts the first queued group only when it has four players. The timer starts immediately.
 6. Live players cannot be moved. **End Match** returns them to the available list.
 7. Closing the desktop window asks for confirmation. Only roster and court settings are saved; attendance, queue, and live matches are cleared.
 
 Players already queued or playing cannot be unchecked in attendance or deleted. An active court cannot be deleted until its match ends. Duplicate player names are allowed because people can share a name; each roster entry has its own identity.
+
+Double-click an available player to place them in the earliest empty slot in the shared queue. If every card is full, or the queue is empty, a new card is created automatically.
+
+Right-click an available player and choose **Remove from today's session** when they leave or stop playing. Their permanent roster entry is kept. Use **Select attendance** to check them back in if they return. Players in queued or live matches must return to the available list before they can leave.
 
 ## Verification and packaging
 
