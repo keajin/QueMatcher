@@ -1,36 +1,26 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const fs = require('node:fs/promises');
+const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron');
+const { createDisplayBoard } = require('./display-board.cjs');
 const path = require('node:path');
 
 let window;
 let confirmedClose = false;
 let saveQueue = Promise.resolve();
+let displayBoard;
 const configPath = () => path.join(app.getPath('userData'), 'setup.json');
 
-app.whenReady().then(() => {
-  ipcMain.handle('setup:load', async () => {
-    try {
-      return JSON.parse(await fs.readFile(configPath(), 'utf8'));
-    } catch (error) {
-      if (error.code === 'ENOENT') return { players: [], courts: [] };
-      throw new Error('Saved setup could not be read. Your existing file has not been changed.');
-    }
-  });
+app.whenReady().then(async () => {
+  const { createSetupStorage } = await import('./setup-storage.js');
+  const storage = createSetupStorage(configPath());
+  ipcMain.handle('setup:capabilities', () => ({ configurationVersion: 1 }));
+  ipcMain.handle('setup:load', () => storage.load());
   ipcMain.handle('setup:save', async (_event, value) => {
-    const { normalizeSetup } = await import('../src/model.js');
-    const data = normalizeSetup(value);
-    if (JSON.stringify(data) !== JSON.stringify(value)) throw new Error('Invalid setup data.');
-    const operation = saveQueue.catch(() => {}).then(async () => {
-      await fs.mkdir(app.getPath('userData'), { recursive: true });
-      const temporaryPath = `${configPath()}.tmp`;
-      await fs.writeFile(temporaryPath, JSON.stringify(data, null, 2), 'utf8');
-      await fs.rename(temporaryPath, configPath());
-    });
+    const operation = storage.save(value);
     saveQueue = operation;
     await operation;
   });
+  displayBoard = createDisplayBoard({ BrowserWindow, screen, ipcMain, getOrganizer: () => window, root: path.join(__dirname, '..') });
   createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate', () => { if (!window || window.isDestroyed()) createWindow(); });
 });
 
 function createWindow() {
@@ -44,18 +34,25 @@ function createWindow() {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.loadFile(path.join(__dirname, '..', 'index.html'));
+  window.on('closed', () => { displayBoard.reset(); window = null; });
   window.on('close', event => {
     if (confirmedClose) return;
     event.preventDefault();
     const answer = dialog.showMessageBoxSync(window, {
       type: 'warning', title: 'Close QueMatcher?',
       message: 'Closing will clear the current queue.',
-      detail: 'Attendance, active matches, and timers will also be cleared. Your saved player roster and court settings will be kept.',
+      detail: 'Attendance, active matches, timers, and match history will also be cleared. Your saved player roster and court settings will be kept.',
       buttons: ['Keep organizing', 'Close app'], defaultId: 0, cancelId: 0, noLink: true
     });
     if (answer === 1) {
       saveQueue.then(() => { confirmedClose = true; window.close(); }).catch(() => {
-        dialog.showMessageBoxSync(window, { type: 'error', message: 'Your latest setup changes could not be saved.', detail: 'Keep the app open and try saving again.' });
+        const discard = dialog.showMessageBoxSync(window, {
+          type: 'warning', title: 'Close without saving?',
+          message: 'Your latest setup changes could not be saved.',
+          detail: 'Closing will discard the failed changes and clear this session. Previously saved players, courts, and configurations will be kept.',
+          buttons: ['Keep organizing', 'Close without saving'], defaultId: 0, cancelId: 0, noLink: true
+        });
+        if (discard === 1) { confirmedClose = true; window.close(); }
       });
     }
   });

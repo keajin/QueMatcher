@@ -117,7 +117,7 @@ test('saved setup excludes session data and rejects duplicate or invalid court n
     queue: ['not saved'], live: { c1: 'not saved' }
   });
   assert.deepEqual(result, { players: [{ id: 'p', name: 'Alex', level: 'green' }], courts: [{ id: 'c1', number: 1 }] });
-  assert.deepEqual(createSession(), { attending: [], queue: [], live: {} });
+  assert.deepEqual(createSession(), { attending: [], queue: [], live: {}, nextMatchNumber: 1, matches: [] });
 });
 
 test('100 attendees across 15 simultaneous courts retain exactly one assignment each', () => {

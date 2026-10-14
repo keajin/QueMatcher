@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'" />
+    <title>PairFect - Display board</title>
+    <link rel="stylesheet" href="./src/display.css" />
+  </head>
+  <body>
+    <header><div class="display-brand"><span class="brand-mark" aria-hidden="true">Q<span></span></span><div>PairFect<small>SMASHERS OF QATAR</small></div></div><div id="configuration-name">Waiting for organizer</div><div class="live-indicator">LIVE · OFFLINE</div></header>
+    <div class="display-layout">
+      <div class="match-board">
+        <section class="board-intro"><p>PSOQ Family...</p><h1>Let’s get playing.</h1></section>
+        <section class="zone"><div class="zone-heading"><h2>Courts <span id="court-count">0</span></h2><span id="court-page"></span></div><div id="court-grid" class="card-grid"></div></section>
+        <section class="zone"><div class="zone-heading"><h2>Shared queue <span id="queue-count">0</span></h2><span id="queue-page"></span></div><div id="queue-grid" class="card-grid"></div></section>
+      </div>
+      <aside class="player-sidebar" aria-label="Session stats and available players">
+        <section class="board-stats" aria-label="Session stats">
+          <div><strong id="stat-checked-in">0</strong><span>Checked in</span></div>
+          <div><strong id="stat-courts-available">0</strong><span>Courts available</span></div>
+          <div><strong id="stat-queued-matches">0</strong><span>Queued matches</span></div>
+          <div><strong id="stat-courts-playing">0</strong><span>Courts playing</span></div>
+        </section>
+        <section class="zone available-zone"><div class="zone-heading"><h2>Available players <span id="available-count">0</span></h2><span id="available-page"></span></div><div id="available-grid" class="available-grid"></div></section>
+      </aside>
+    </div>
+    <footer><span id="board-summary">Waiting for the session…</span><span>10 courts per page · First 7 queued matches · Esc closes this display only</span></footer>
+    <script type="module" src="./src/display.js"></script>
+  </body>
+</html>

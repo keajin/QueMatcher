@@ -16,10 +16,22 @@ export function normalizeSetup(input) {
   return { players, courts };
 }
 
-export function createSession() { return { attending: [], queue: [], live: {} }; }
+export function createSession() { return { attending: [], queue: [], live: {}, nextMatchNumber: 1, matches: [] }; }
 export function isLive(session, playerId) { return Object.values(session.live).some(match => match.players.includes(playerId)); }
 export function isQueued(session, playerId) { return session.queue.some(match => match.players.includes(playerId)); }
 export function availablePlayers(session) { return session.attending.filter(id => !isLive(session, id) && !isQueued(session, id)); }
+
+export function playerMatchHistory(session, playerId) {
+  return session.matches.filter(match => match.players.includes(playerId));
+}
+
+export function previousRepeatedMatch(session, players) {
+  if (players.length !== 4 || players.some(id => !id) || new Set(players).size !== 4) return null;
+  const previous = players.map(id => session.matches.findLast(match => match.players.includes(id)));
+  const match = previous[0];
+  if (!match || !previous.every(item => item?.number === match.number)) return null;
+  return match.players.length === 4 && match.players.every(id => players.includes(id)) ? match : null;
+}
 
 export function movePlayer(session, playerId, matchId = null, slot = null) {
   if (!session.attending.includes(playerId) || isLive(session, playerId)) throw new Error('Only available or queued players can be moved.');
@@ -54,19 +66,27 @@ export function removeAvailablePlayer(session, playerId) {
   session.attending = session.attending.filter(id => id !== playerId);
 }
 
-export function startMatch(session, courtId, now = Date.now()) {
+export function startMatch(session, courtId, now = Date.now(), options = {}) {
   if (session.live[courtId]) throw new Error('This court is already playing.');
   const next = session.queue[0];
   if (!next) throw new Error('Add a match to the shared queue first.');
   if (next.players.length !== 4 || next.players.some(id => !id) || new Set(next.players).size !== 4) throw new Error('The first queued match must have exactly 4 players.');
   if (next.players.some(id => !session.attending.includes(id) || isLive(session, id))) throw new Error('A queued player is unavailable.');
+  if (options.expectedMatchId && (next.id !== options.expectedMatchId || options.expectedPlayers?.length !== 4 || new Set(options.expectedPlayers).size !== 4 || !options.expectedPlayers.every(id => next.players.includes(id)))) throw new Error('The next queued match changed. Review it before starting.');
+  const repeat = previousRepeatedMatch(session, next.players);
+  if (repeat && !options.allowRepeat) throw new Error(`These players were together in their last match (#${repeat.number}). Confirm before starting again.`);
+  const number = session.nextMatchNumber;
   session.queue.shift();
-  session.live[courtId] = { players: [...next.players], startedAt: now };
+  session.live[courtId] = { players: [...next.players], startedAt: now, number };
+  session.matches.push({ number, courtId, players: [...next.players], startedAt: now, endedAt: null });
+  session.nextMatchNumber++;
 }
 
-export function endMatch(session, courtId) {
+export function endMatch(session, courtId, now = Date.now()) {
   const match = session.live[courtId];
   if (!match) return;
+  const record = session.matches.find(item => item.number === match.number);
+  if (record) record.endedAt = now;
   session.attending = [...session.attending.filter(id => !match.players.includes(id)), ...match.players];
   delete session.live[courtId];
 }

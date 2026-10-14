@@ -1,14 +1,27 @@
-import { LEVELS, uid, normalizeSetup, createSession, availablePlayers, isLive, isQueued, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, startMatch, endMatch, reorderMatch } from './model.js';
+import { LEVELS, uid, createSession, availablePlayers, isLive, isQueued, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, playerMatchHistory, previousRepeatedMatch, startMatch, endMatch, reorderMatch } from './model.js';
+import { normalizeConfigurations, activeConfiguration, configurationSetup, updateConfigurationSetup, addConfiguration, renameConfiguration, selectConfiguration } from './configurations.js';
+import { createDisplayState } from './display-state.js';
 
 const root = document.querySelector('#app');
 const attendanceDialog = document.querySelector('#attendance-dialog');
 const playerMenu = document.querySelector('#player-menu');
 const removeAttendeeButton = document.querySelector('#remove-attendee');
+const playerHistory = document.querySelector('#player-history');
+const repeatMatchDialog = document.querySelector('#repeat-match-dialog');
+let pendingRepeatMatch = null;
+const displaySettings = document.querySelector('#display-settings');
+let lastDisplayState = null;
 let menuPlayerId = null;
-let setup = { players: [], courts: [] };
+let menuPlayerElement = null;
+const configurationDialog = document.querySelector('#configuration-dialog');
+let pendingConfigurations = null;
+let configurations = normalizeConfigurations(null);
+let setup = configurationSetup(configurations);
 const session = createSession();
 let page = 'session', search = '', rosterSearch = '', levelFilter = 'all', toastTimer;
 let saving = false, loadFailed = false;
+let desktopOutdated = false;
+const restartMessage = 'The desktop save handler is out of date. Fully quit the app and reopen it before saving. Reloading the window is not enough.';
 let sidebarCollapsed = false;
 let theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 try {
@@ -43,23 +56,90 @@ function toast(message, error = false) {
 }
 
 async function saveSetup(next) {
-  if (loadFailed) return toast('Saved setup could not be loaded. Restart the app before editing it.', true);
-  if (saving) return toast('Please wait for the current save.', true);
+  return saveConfigurations(updateConfigurationSetup(configurations, next));
+}
+
+async function saveConfigurations(next) {
+  if (desktopOutdated) { toast(restartMessage, true); return false; }
+  if (loadFailed) { toast('Saved setup could not be loaded. Restart the app before editing it.', true); return false; }
+  if (saving) { toast('Please wait for the current save.', true); return false; }
   saving = true;
   try {
     if (window.desktop) await window.desktop.saveSetup(next);
-    else localStorage.setItem('quematcher.setup', JSON.stringify(next));
-    setup = next;
+    else {
+      const previous = localStorage.getItem('quematcher.setup');
+      if (previous && !JSON.parse(previous).configs && !localStorage.getItem('quematcher.setup.legacy-backup')) localStorage.setItem('quematcher.setup.legacy-backup', previous);
+      localStorage.setItem('quematcher.setup', JSON.stringify(next));
+    }
+    const switched = next.activeConfigId !== configurations.activeConfigId;
+    configurations = next;
+    setup = configurationSetup(configurations);
+    if (switched) {
+      Object.assign(session, createSession());
+      selectedPlayer = null;
+      search = ''; rosterSearch = ''; levelFilter = 'all';
+    }
     render();
+    return true;
   } catch (error) { toast(`Could not save setup: ${error.message}`, true); }
   finally { saving = false; }
+  return false;
+}
+
+async function requestConfigurationChange(next) {
+  if (loadFailed || saving) return saveConfigurations(next);
+  if (next.activeConfigId !== configurations.activeConfigId && (session.attending.length || session.queue.length || Object.keys(session.live).length)) {
+    pendingConfigurations = next;
+    document.querySelector('#configuration-switch-message').textContent = `Switch to "${activeConfiguration(next).name}" and start a fresh session?`;
+    configurationDialog.showModal();
+    return;
+  }
+  await saveConfigurations(next);
 }
 
 function plate(id, draggable = true) {
   const player = playerById(id);
   if (!player) return '';
-  return `<div class="player ${player.level}" ${draggable ? 'draggable="true" tabindex="0"' : ''} data-player="${esc(id)}" title="${esc(player.name)}"><span class="skill-dot"></span><span class="player-name">${esc(player.name)}</span>${draggable ? '<span class="grip" aria-hidden="true">⠿</span>' : ''}</div>`;
+  const lastMatch = playerMatchHistory(session, id).at(-1);
+  return `<div class="player ${player.level}" tabindex="0" ${draggable ? 'draggable="true"' : ''} data-player="${esc(id)}" title="${esc(player.name)} · Right-click for match history"><span class="skill-dot"></span><span class="player-name">${esc(player.name)}</span>${lastMatch ? `<span class="player-match-number" title="Most recent match: ${lastMatch.number}" aria-label="Most recent match ${lastMatch.number}">#${lastMatch.number}</span>` : ''}${draggable ? '<span class="grip" aria-hidden="true">⠿</span>' : ''}</div>`;
 }
+
+function publishDisplayState() {
+  if (!window.desktop?.publishDisplayState) return;
+  const state = createDisplayState(setup, session, activeConfiguration(configurations).name, theme);
+  const serialized = JSON.stringify(state);
+  if (serialized === lastDisplayState) return;
+  lastDisplayState = serialized;
+  window.desktop.publishDisplayState(state);
+}
+
+async function openDisplaySettings() {
+  if (!window.desktop?.getDisplayScreens) return toast('The display board requires the desktop app. Fully quit and reopen the updated app if it is already running.', true);
+  try {
+    const screens = await window.desktop.getDisplayScreens();
+    const preferred = screens.find(screen => !screen.organizerScreen) || screens[0];
+    document.querySelector('#display-screen').innerHTML = screens.map(screen => `<option value="${screen.id}" ${screen.id === preferred.id ? 'selected' : ''}>${esc(screen.label)} · ${screen.width} × ${screen.height}${screen.organizerScreen ? ' (organizer screen)' : ''}</option>`).join('');
+    document.querySelector('#display-fill').checked = !preferred.organizerScreen;
+    displaySettings.showModal();
+  } catch (error) { toast(`Could not open display settings: ${error.message}. Fully quit and reopen the updated app if needed.`, true); }
+}
+
+document.querySelector('#cancel-display-settings').addEventListener('click', () => displaySettings.close());
+document.querySelector('#close-display-board').addEventListener('click', async () => {
+  try { await window.desktop.closeDisplayBoard(); displaySettings.close(); }
+  catch (error) { toast(`Could not close the board: ${error.message}`, true); }
+});
+document.querySelector('#display-settings-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const submit = displaySettings.querySelector('[type="submit"]');
+  submit.disabled = true;
+  try {
+    publishDisplayState();
+    await window.desktop.openDisplayBoard({ screenId: Number(document.querySelector('#display-screen').value), fill: document.querySelector('#display-fill').checked });
+    displaySettings.close();
+  } catch (error) { toast(`Could not open the board: ${error.message}`, true); }
+  finally { submit.disabled = false; }
+});
 
 function slots(players, live = false, matchId = '') {
   return Array.from({ length: 4 }, (_, index) => `<div class="slot ${players[index] ? 'filled' : ''}" ${!live ? `data-drop-slot="${index}" data-match="${esc(matchId)}"` : ''}>${players[index] ? plate(players[index], !live) : `<span class="slot-number">${index + 1}</span><span>${live ? 'Waiting for a match' : 'Drop player here'}</span>`}</div>`).join('');
@@ -73,15 +153,28 @@ function clock(start) {
 function renderSidebar() {
   return `<aside class="sidebar" id="sidebar">
     <button class="sidebar-toggle" data-action="toggle-sidebar" aria-controls="sidebar" aria-expanded="${!sidebarCollapsed}" aria-label="${sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar" title="${sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar"><span aria-hidden="true">${sidebarCollapsed ? '›' : '‹'}</span><span class="nav-text">Collapse sidebar</span></button>
-    <a class="brand" href="#" data-action="session" aria-label="QueMatcher session board"><span class="brand-mark">Q<span></span></span><span class="brand-text">QueMatcher<small>THE SOCIAL COURT</small></span></a>
-    <div class="nav-label">YOUR CLUBHOUSE</div>
+    <a class="brand" href="#" data-action="session" aria-label="QueMatcher session board"><span class="brand-mark">Q<span></span></span><span class="brand-text">PairFect<small>SMASHERS OF QATAR</small></span></a>
+    <div class="nav-label">YOUR STADIUM</div>
     <nav><button data-action="session" title="Session board" aria-label="Session board" class="nav-button ${page === 'session' ? 'selected' : ''}"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Session board</span></button><button data-action="setup" title="Roster & courts" aria-label="Roster and courts" class="nav-button ${page === 'setup' ? 'selected' : ''}"><span class="nav-icon" aria-hidden="true">☷</span><span class="nav-text">Roster & courts</span></button></nav>
-    <div class="sidebar-bottom"><span class="offline-dot"></span><span class="nav-text">Entirely offline<small>Your club. Your computer.</small></span></div>
+    <div class="sidebar-bottom"><span class="offline-dot"></span><span class="nav-text">For PSOQ<small>All seasons use</small></span></div>
   </aside>`;
 }
 
 function renderTopbar() {
-  return `<header class="topbar"><span>BADMINTON / ${page === 'session' ? 'SESSION' : 'SAVED SETUP'}</span><div class="topbar-actions"><span class="session-tag">${page === 'session' ? 'SESSION IN PROGRESS' : 'PERMANENT SETTINGS'}</span><button class="theme-toggle" data-action="toggle-theme" aria-pressed="${theme === 'dark'}" aria-label="Dark mode" title="Switch to ${theme === 'dark' ? 'light' : 'dark'} mode"><span aria-hidden="true">${theme === 'dark' ? '☀' : '☾'}</span>${theme === 'dark' ? 'Light mode' : 'Dark mode'}</button></div></header>`;
+  return `<header class="topbar"><span>BADMINTON / ${page === 'session' ? 'SESSION' : 'SAVED SETUP'}</span><div class="topbar-actions"><button class="theme-toggle" data-action="display-board" title="Open a read-only board on a connected screen">Display board ↗</button><button class="configuration-badge" data-action="setup" title="Manage saved configurations">${esc(activeConfiguration(configurations).name)}</button><button class="theme-toggle" data-action="toggle-theme" aria-pressed="${theme === 'dark'}" aria-label="Dark mode" title="Switch to ${theme === 'dark' ? 'light' : 'dark'} mode"><span aria-hidden="true">${theme === 'dark' ? '☀' : '☾'}</span>${theme === 'dark' ? 'Light mode' : 'Dark mode'}</button></div></header>${desktopOutdated ? `<div class="desktop-warning" role="alert">${esc(restartMessage)}</div>` : ''}`;
+}
+
+function configurationPanel() {
+  const config = activeConfiguration(configurations);
+  return `<section class="configuration-panel" aria-labelledby="configuration-heading">
+    <div class="section-title"><div><h2 id="configuration-heading">Saved configurations <span class="count">${configurations.configs.length}</span></h2><p class="hint">Keep a separate roster and court setup for each group or venue.</p></div></div>
+    <div class="configuration-controls">
+      <label class="configuration-select-label">Current configuration<select id="configuration-select" ${loadFailed ? 'disabled' : ''}>${configurations.configs.map(item => `<option value="${esc(item.id)}" ${item.id === config.id ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label>
+      <form id="rename-configuration"><label>Configuration name<input name="name" value="${esc(config.name)}" maxlength="80" required /></label><button class="button subtle" type="submit" ${loadFailed ? 'disabled' : ''}>Rename</button></form>
+      <form id="add-configuration"><label>New configuration<input name="name" placeholder="e.g. Friday social" maxlength="80" required /></label><button class="button dark" type="submit" ${loadFailed ? 'disabled' : ''}>Add config</button></form>
+    </div>
+    <p class="hint">Edits below save to <strong>${esc(config.name)}</strong>. New configurations start empty. Switching starts a fresh session; saved rosters and courts stay intact.</p>
+  </section>`;
 }
 
 function renderCourts() {
@@ -90,7 +183,7 @@ function renderCourts() {
     const highlightUntil = live ? live.startedAt + 10000 : 0;
     return `<article class="match-card court ${live ? 'playing' : ''} ${Date.now() < highlightUntil ? 'just-started' : ''}" ${live ? `data-highlight-until="${highlightUntil}"` : ''}>
       <div class="card-heading"><h3>Court ${court.number}</h3><span class="status ${live ? 'on' : ''}">${live ? 'PLAYING' : 'OPEN'}</span></div>
-      <div class="card-meta">${live ? 'Match in progress' : 'Ready for the next group'}</div>
+      <div class="card-meta">${live ? `Match #${live.number} in progress` : 'Ready for the next group'}</div>
       <div class="match-players">${slots(live?.players || [], true)}</div>
       <div class="card-footer"><span class="timer" ${live ? `data-start="${live.startedAt}"` : ''}>${live ? clock(live.startedAt) : '--:--'}</span><button class="button ${live ? 'danger' : 'blue-button'}" data-action="${live ? 'end' : 'next'}" data-court="${esc(court.id)}">${live ? 'End Match' : 'Next Match'}</button></div>
     </article>`;
@@ -100,9 +193,11 @@ function renderCourts() {
 function renderQueue() {
   return session.queue.map((match, index) => {
     const count = match.players.filter(Boolean).length;
-    return `<article class="match-card queued-match" data-queue-match="${esc(match.id)}">
+    const repeat = previousRepeatedMatch(session, match.players);
+    return `<article class="match-card queued-match ${repeat ? 'repeat-match' : ''}" data-queue-match="${esc(match.id)}">
       <div class="card-heading"><h3><span class="match-handle" draggable="true" data-drag-match="${esc(match.id)}" title="Drag to reorder Queue ${index + 1}" aria-hidden="true">⠿</span>Queue ${index + 1}</h3><span class="status ${count === 4 ? 'on' : ''}">${count}/4 ${count === 4 ? 'READY' : 'PLAYERS'}</span></div>
       <div class="card-meta">${index === 0 ? 'Next on an available court' : 'Waiting in the shared queue'}</div>
+      ${repeat ? `<p class="repeat-warning" role="status">Repeats their last match (#${repeat.number})</p>` : ''}
       <div class="match-players">${slots(match.players, false, match.id)}</div>
       <div class="card-footer"><div class="match-tools"><button class="text-button" data-action="move-up" data-match="${esc(match.id)}" ${index === 0 ? 'disabled' : ''} aria-label="Move Queue ${index + 1} up">↑ Up</button><button class="text-button" data-action="move-down" data-match="${esc(match.id)}" ${index === session.queue.length - 1 ? 'disabled' : ''} aria-label="Move Queue ${index + 1} down">↓ Down</button></div><button class="icon-button delete-match" data-action="delete-match" data-match="${esc(match.id)}" aria-label="Delete Queue ${index + 1}" title="Delete match">×</button></div>
     </article>`;
@@ -113,11 +208,12 @@ function render() {
   playerMenu.hidePopover();
   const available = availablePlayers(session);
   const playingCount = Object.keys(session.live).length;
-  root.innerHTML = `${renderSidebar()}<main>${renderTopbar()}${page === 'session' ? `<section class="page-heading"><div><div class="eyebrow">LESS ADMIN. MORE BADMINTON.</div><h1>Let’s get playing.</h1><p>Build your matches. Keep the courts moving.</p></div><button class="button dark" data-action="attendance">Select attendance <span>↗</span></button></section><div class="stats"><div><strong>${session.attending.length}</strong><span>checked in</span></div><div><strong>${available.length}</strong><span>available</span></div><div><strong>${session.queue.length}</strong><span>queued matches</span></div><div><strong>${playingCount}<small> / ${setup.courts.length}</small></strong><span>courts playing</span></div></div><div class="workspace"><section class="available-panel" data-drop-available><div class="section-title"><h2>Available players</h2><span class="count">${available.length}</span></div><p class="hint">Drag a name into a queued match.</p><label class="search-label"><span>⌕</span><input id="player-search" type="search" placeholder="Find a player…" value="${esc(search)}" aria-label="Find an available player" /></label><div class="filters"><button data-filter="all" class="${levelFilter === 'all' ? 'active' : ''}">All</button>${LEVELS.map(level => `<button class="filter-dot ${level} ${levelFilter === level ? 'active' : ''}" data-filter="${level}" aria-label="Filter ${level} players" title="${level}"></button>`).join('')}</div><div class="player-list">${available.filter(id => { const player = playerById(id); return player && player.name.toLowerCase().includes(search.toLowerCase()) && (levelFilter === 'all' || player.level === levelFilter); }).map(id => plate(id)).join('') || `<div class="empty-list"><span>＋</span><strong>${session.attending.length ? 'No matching players' : 'Who’s playing today?'}</strong><p>${session.attending.length ? 'Players return here after their match.' : 'Select attendance from your saved roster to get started.'}</p>${!session.attending.length ? '<button class="button subtle" data-action="attendance">Select players</button>' : ''}</div>`}</div><div class="return-zone">Drop here to return a queued player</div></section><div class="board"><section><div class="section-title"><div><h2>Live courts <span class="count">${setup.courts.length}</span></h2><p class="hint">Take the next match when a court is ready.</p></div><button class="text-button" data-action="setup">Manage courts ↗</button></div><div class="courts">${renderCourts()}</div></section><section class="queue-section"><div class="section-title"><div><h2>Shared queue <span class="count">${session.queue.length}</span></h2><p class="hint">One shared queue. Drag the handle to change the order.</p></div><button class="button dark" data-action="add-match">＋ Add Match</button></div><div class="queue">${renderQueue()}<div class="queue-end" data-drop-end>Drag a match here to move it to the end</div></div></section></div></div>` : setupPage()}</main>`;
+  root.innerHTML = `${renderSidebar()}<main>${renderTopbar()}${page === 'session' ? `<section class="page-heading"><div><div class="eyebrow">PSOQ FAMILY...</div><h1>Let’s get playing.</h1></div><button class="button dark" data-action="attendance">Select attendance <span>↗</span></button></section><div class="stats"><div><strong>${session.attending.length}</strong><span>checked in</span></div><div><strong>${available.length}</strong><span>available</span></div><div><strong>${session.queue.length}</strong><span>queued matches</span></div><div><strong>${playingCount}<small> / ${setup.courts.length}</small></strong><span>courts playing</span></div></div><div class="workspace"><section class="available-panel" data-drop-available><div class="section-title"><h2>Available players</h2><span class="count">${available.length}</span></div><p class="hint">Drag a name into a queued match.</p><label class="search-label"><span>⌕</span><input id="player-search" type="search" placeholder="Find a player…" value="${esc(search)}" aria-label="Find an available player" /></label><div class="filters"><button data-filter="all" class="${levelFilter === 'all' ? 'active' : ''}">All</button>${LEVELS.map(level => `<button class="filter-dot ${level} ${levelFilter === level ? 'active' : ''}" data-filter="${level}" aria-label="Filter ${level} players" title="${level}"></button>`).join('')}</div><div class="player-list">${available.filter(id => { const player = playerById(id); return player && player.name.toLowerCase().includes(search.toLowerCase()) && (levelFilter === 'all' || player.level === levelFilter); }).map(id => plate(id)).join('') || `<div class="empty-list"><span>＋</span><strong>${session.attending.length ? 'No matching players' : 'Who’s playing today?'}</strong><p>${session.attending.length ? 'Players return here after their match.' : 'Select attendance from your saved roster to get started.'}</p>${!session.attending.length ? '<button class="button subtle" data-action="attendance">Select players</button>' : ''}</div>`}</div><div class="return-zone">Drop here to return a queued player</div></section><div class="board"><section><div class="section-title"><div><h2>Live courts <span class="count">${setup.courts.length}</span></h2><p class="hint">Take the next match when a court is ready.</p></div><button class="text-button" data-action="setup">Manage courts ↗</button></div><div class="courts">${renderCourts()}</div></section><section class="queue-section"><div class="section-title"><div><h2>Shared queue <span class="count">${session.queue.length}</span></h2><p class="hint">One shared queue. Drag the handle to change the order.</p></div><button class="button dark" data-action="add-match">＋ Add Match</button></div><div class="queue">${renderQueue()}<div class="queue-end" data-drop-end>Drag a match here to move it to the end</div></div></section></div></div>` : setupPage()}</main>`;
+  publishDisplayState();
 }
 
 function setupPage() {
-  return `<section class="page-heading"><div><div class="eyebrow">READY BEFORE THE FIRST SERVE</div><h1>Your club, remembered.</h1><p>Save your roster and courts. Choose attendance for each session.</p></div><span class="saved-note">${loadFailed ? 'Setup unavailable' : 'Saved on this computer'}</span></section><div class="setup-grid"><section class="setup-card"><div class="section-title"><h2>Player roster</h2><span class="count">${setup.players.length}</span></div><form id="add-player"><label>Name<input name="name" placeholder="Player name" maxlength="80" required /></label><label>Skill color<select name="level">${LEVELS.map(level => `<option value="${level}">${level[0].toUpperCase() + level.slice(1)}</option>`).join('')}</select></label><button class="button dark" type="submit">Add player</button></form><label class="search-label"><span>⌕</span><input id="roster-search" placeholder="Search saved players…" type="search" value="${esc(rosterSearch)}" aria-label="Search saved players" /></label><div class="roster-list">${setup.players.filter(player => player.name.toLowerCase().includes(rosterSearch.toLowerCase())).map(player => `<form class="roster-row" data-edit-player="${esc(player.id)}"><span class="skill-dot ${player.level}"></span><input name="name" value="${esc(player.name)}" maxlength="80" required aria-label="Player name" /><select name="level" aria-label="Skill color">${LEVELS.map(level => `<option value="${level}" ${player.level === level ? 'selected' : ''}>${level}</option>`).join('')}</select><button class="text-button" type="submit">Save</button><button class="icon-button" type="button" data-action="delete-player" data-player-id="${esc(player.id)}" ${isLive(session, player.id) || isQueued(session, player.id) ? 'disabled title="Return this player to available before deleting"' : 'title="Delete player"'} aria-label="Delete ${esc(player.name)}">×</button></form>`).join('') || '<p class="setup-empty">Add your regular players here. They will be ready for your next session.</p>'}</div></section><section class="setup-card"><div class="section-title"><h2>Courts</h2><span class="count">${setup.courts.length}</span></div><p class="hint">Unique positive whole numbers only.</p><form id="add-court"><label>Court number<input name="number" type="number" min="1" step="1" placeholder="1" required /></label><button class="button dark" type="submit">Add court</button></form><div class="court-settings">${[...setup.courts].sort((a, b) => a.number - b.number).map(court => `<form class="court-setting" data-edit-court="${esc(court.id)}"><span>Court</span><input name="number" value="${court.number}" type="number" min="1" step="1" required aria-label="Court number" /><button class="text-button" type="submit">Save</button><button class="icon-button" type="button" data-action="delete-court" data-court="${esc(court.id)}" ${session.live[court.id] ? 'disabled title="End the match before deleting this court"' : 'title="Delete court"'} aria-label="Delete court ${court.number}">×</button></form>`).join('') || '<p class="setup-empty">Add the courts you use. You can change their numbers anytime.</p>'}</div><div class="setup-tip"><strong>A fresh start, every session.</strong><p>Only these settings are saved. Closing QueMatcher clears attendance, queued games, and live matches.</p></div></section></div>`;
+  return `<section class="page-heading"><div><div class="eyebrow">READY BEFORE THE FIRST SERVE</div><h1>Your Family, remembered.</h1><p>Save your roster and courts. Choose attendance for each session.</p></div><span class="saved-note">${loadFailed ? 'Setup unavailable' : 'Saved on this computer'}</span></section>${configurationPanel()}<div class="setup-grid"><section class="setup-card"><div class="section-title"><h2>Player roster</h2><span class="count">${setup.players.length}</span></div><form id="add-player"><label>Name<input name="name" placeholder="Player name" maxlength="80" required /></label><label>Skill color<select name="level">${LEVELS.map(level => `<option value="${level}">${level[0].toUpperCase() + level.slice(1)}</option>`).join('')}</select></label><button class="button dark" type="submit">Add player</button></form><label class="search-label"><span>⌕</span><input id="roster-search" placeholder="Search saved players…" type="search" value="${esc(rosterSearch)}" aria-label="Search saved players" /></label><div class="roster-list">${setup.players.filter(player => player.name.toLowerCase().includes(rosterSearch.toLowerCase())).map(player => `<form class="roster-row" data-edit-player="${esc(player.id)}"><span class="skill-dot ${player.level}"></span><input name="name" value="${esc(player.name)}" maxlength="80" required aria-label="Player name" /><select name="level" aria-label="Skill color">${LEVELS.map(level => `<option value="${level}" ${player.level === level ? 'selected' : ''}>${level}</option>`).join('')}</select><button class="text-button" type="submit">Save</button><button class="icon-button" type="button" data-action="delete-player" data-player-id="${esc(player.id)}" ${isLive(session, player.id) || isQueued(session, player.id) ? 'disabled title="Return this player to available before deleting"' : 'title="Delete player"'} aria-label="Delete ${esc(player.name)}">×</button></form>`).join('') || '<p class="setup-empty">Add your regular players here. They will be ready for your next session.</p>'}</div></section><section class="setup-card"><div class="section-title"><h2>Courts</h2><span class="count">${setup.courts.length}</span></div><p class="hint">Unique positive whole numbers only.</p><form id="add-court"><label>Court number<input name="number" type="number" min="1" step="1" placeholder="1" required /></label><button class="button dark" type="submit">Add court</button></form><div class="court-settings">${[...setup.courts].sort((a, b) => a.number - b.number).map(court => `<form class="court-setting" data-edit-court="${esc(court.id)}"><span>Court</span><input name="number" value="${court.number}" type="number" min="1" step="1" required aria-label="Court number" /><button class="text-button" type="submit">Save</button><button class="icon-button" type="button" data-action="delete-court" data-court="${esc(court.id)}" ${session.live[court.id] ? 'disabled title="End the match before deleting this court"' : 'title="Delete court"'} aria-label="Delete court ${court.number}">×</button></form>`).join('') || '<p class="setup-empty">Add the courts you use. You can change their numbers anytime.</p>'}</div><div class="setup-tip"><strong>A fresh start, every session.</strong><p>Only these settings are saved. Closing QueMatcher clears attendance, queued games, and live matches.</p></div></section></div>`;
 }
 
 function openAttendance() {
@@ -137,9 +233,18 @@ root.addEventListener('click', async event => {
     else if (action === 'toggle-theme') { theme = theme === 'dark' ? 'light' : 'dark'; saveAppearance(); }
     else if (action === 'session' || action === 'setup') page = action;
     else if (action === 'attendance') { openAttendance(); return; }
+    else if (action === 'display-board') { await openDisplaySettings(); return; }
     else if (action === 'add-match') session.queue.push({ id: uid(), players: [null, null, null, null] });
     else if (action === 'delete-match') session.queue = session.queue.filter(match => match.id !== button.dataset.match);
     else if (action === 'next') {
+      const next = session.queue[0];
+      const repeat = next && previousRepeatedMatch(session, next.players);
+      if (repeat && !session.live[button.dataset.court]) {
+        pendingRepeatMatch = { courtId: button.dataset.court, matchId: next.id, players: [...next.players] };
+        document.querySelector('#repeat-match-message').textContent = `${next.players.map(id => playerById(id)?.name || 'Player').join(', ')} played together in their most recent match (#${repeat.number}).`;
+        repeatMatchDialog.showModal();
+        return;
+      }
       startMatch(session, button.dataset.court);
       setTimeout(updateCourtTimers, 10000);
     }
@@ -164,7 +269,13 @@ root.addEventListener('click', async event => {
 root.addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.target, data = new FormData(form);
-  if (form.id === 'add-player' || form.dataset.editPlayer) {
+  if (form.id === 'add-configuration' || form.id === 'rename-configuration') {
+    try {
+      const name = String(data.get('name'));
+      if (form.id === 'add-configuration') await requestConfigurationChange(addConfiguration(configurations, name));
+      else await saveConfigurations(renameConfiguration(configurations, configurations.activeConfigId, name));
+    } catch (error) { toast(error.message, true); }
+  } else if (form.id === 'add-player' || form.dataset.editPlayer) {
     const name = String(data.get('name')).trim(), level = data.get('level');
     if (!name) return toast('Enter a player name.', true);
     if (form.id === 'add-player') await saveSetup({ ...setup, players: [...setup.players, { id: uid(), name, level }] });
@@ -187,6 +298,27 @@ root.addEventListener('input', event => {
   const input = document.getElementById(id);
   input.focus();
   if (cursor !== null) input.setSelectionRange(cursor, cursor);
+});
+
+root.addEventListener('change', async event => {
+  if (event.target.id !== 'configuration-select') return;
+  const id = event.target.value;
+  event.target.value = configurations.activeConfigId;
+  if (id === configurations.activeConfigId) return;
+  try { await requestConfigurationChange(selectConfiguration(configurations, id)); }
+  catch (error) { toast(error.message, true); }
+});
+
+document.querySelector('#cancel-configuration-switch').addEventListener('click', () => { if (!saving) configurationDialog.close(); });
+configurationDialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+configurationDialog.addEventListener('close', () => { pendingConfigurations = null; });
+document.querySelector('#configuration-switch-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!pendingConfigurations || saving) return;
+  const buttons = [...configurationDialog.querySelectorAll('button')];
+  buttons.forEach(button => button.disabled = true);
+  try { if (await saveConfigurations(pendingConfigurations)) configurationDialog.close(); }
+  finally { buttons.forEach(button => button.disabled = false); }
 });
 
 root.addEventListener('dragstart', event => {
@@ -236,10 +368,14 @@ root.addEventListener('dblclick', event => {
 });
 
 root.addEventListener('contextmenu', event => {
-  const player = event.target.closest('[data-player][draggable]');
-  if (!player?.closest('[data-drop-available]')) return;
+  const player = event.target.closest('[data-player]');
+  if (!player) return;
   event.preventDefault();
   menuPlayerId = player.dataset.player;
+  menuPlayerElement = player;
+  const history = playerMatchHistory(session, menuPlayerId);
+  playerHistory.innerHTML = `<h3>${esc(playerById(menuPlayerId)?.name || 'Player')}</h3><p class="history-label">THIS SESSION · ${history.length} ${history.length === 1 ? 'MATCH' : 'MATCHES'}</p>${history.length ? `<ol class="history-list">${[...history].reverse().map(match => `<li><strong>Match #${match.number}</strong><span>${match.endedAt === null ? 'Playing' : 'Completed'}</span></li>`).join('')}</ol>` : '<p class="history-empty">No matches played yet.</p>'}`;
+  removeAttendeeButton.hidden = !availablePlayers(session).includes(menuPlayerId);
   playerMenu.hidePopover();
   playerMenu.showPopover();
   const bounds = player.getBoundingClientRect();
@@ -247,8 +383,37 @@ root.addEventListener('contextmenu', event => {
   const y = event.clientY || bounds.bottom;
   playerMenu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - playerMenu.offsetWidth - 8))}px`;
   playerMenu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - playerMenu.offsetHeight - 8))}px`;
-  removeAttendeeButton.focus();
+  if (removeAttendeeButton.hidden) playerHistory.focus();
+  else removeAttendeeButton.focus();
 });
+
+document.querySelector('#cancel-repeat-match').addEventListener('click', () => repeatMatchDialog.close());
+repeatMatchDialog.addEventListener('close', () => { pendingRepeatMatch = null; });
+document.querySelector('#repeat-match-form').addEventListener('submit', event => {
+  event.preventDefault();
+  if (!pendingRepeatMatch) return;
+  try {
+    startMatch(session, pendingRepeatMatch.courtId, Date.now(), { allowRepeat: true, expectedMatchId: pendingRepeatMatch.matchId, expectedPlayers: pendingRepeatMatch.players });
+    repeatMatchDialog.close();
+    render();
+    setTimeout(updateCourtTimers, 10000);
+  } catch (error) { repeatMatchDialog.close(); toast(error.message, true); }
+});
+
+// Manual popovers avoid dismissal by the mouse release that opened the menu.
+document.addEventListener('pointerdown', event => {
+  if (event.button === 0 && !playerMenu.contains(event.target)) playerMenu.hidePopover();
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !playerMenu.matches(':popover-open')) return;
+  event.preventDefault();
+  playerMenu.hidePopover();
+  if (menuPlayerElement?.isConnected) menuPlayerElement.focus();
+});
+document.addEventListener('contextmenu', event => {
+  if (!event.defaultPrevented && !playerMenu.contains(event.target)) playerMenu.hidePopover();
+});
+window.addEventListener('blur', () => playerMenu.hidePopover());
 
 removeAttendeeButton.addEventListener('click', () => {
   try {
@@ -306,6 +471,14 @@ setInterval(updateCourtTimers, 1000);
 if (!window.desktop) window.addEventListener('beforeunload', event => { event.preventDefault(); event.returnValue = ''; });
 
 try {
-  setup = normalizeSetup(window.desktop ? await window.desktop.loadSetup() : JSON.parse(localStorage.getItem('quematcher.setup') || '{}'));
+  configurations = normalizeConfigurations(window.desktop ? await window.desktop.loadSetup() : JSON.parse(localStorage.getItem('quematcher.setup') || '{}'));
+  setup = configurationSetup(configurations);
+  if (window.desktop) {
+    try {
+      const capabilities = await window.desktop.getSetupCapabilities?.();
+      desktopOutdated = capabilities?.configurationVersion !== 1;
+    } catch { desktopOutdated = true; }
+    if (desktopOutdated) toast(restartMessage, true);
+  }
 } catch (error) { loadFailed = true; toast(error.message || 'Could not load saved setup.', true); }
 render();

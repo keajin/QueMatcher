@@ -46,6 +46,42 @@ The installed app works entirely offline without accounts or external services. 
 - Player name plates use solid skill colors and larger, bold names. Long names wrap to stay readable.
 - A court lights up for **10 seconds** when a match starts, then returns to its normal playing appearance.
 
+## Saved configurations
+
+Open **Roster & courts** to manage named configurations for different groups, venues, or regular sessions.
+
+1. Enter a name under **New configuration** and click **Add config**. The new configuration starts with an empty roster and no courts.
+2. Add players and courts below. Changes are saved to the selected configuration automatically.
+3. Edit **Configuration name** and click **Rename** to change its name. Its saved players and courts remain intact.
+4. Choose another setup under **Current configuration** to load its saved roster and courts. The active configuration name also appears in the session header.
+
+Switching configurations starts a fresh session. If attendance, queued games, or active matches exist, a confirmation asks before clearing them. Canceling leaves the session and selected configuration intact. Renaming the current configuration does not reset the session.
+
+Existing saved players and courts automatically become **Default configuration**. The first configuration save preserves the original desktop setup file as `setup.json.legacy-backup`. Each configuration's roster and courts, plus the last selected configuration, are remembered between launches; attendance and matches are still temporary.
+
+## Match history and repeat warnings
+
+Matches receive consecutive numbers when they start, shared across every court. Queue card numbers describe queue position; they are separate from played match numbers. Each player's tag shows their most recent match number. Right-click a tag in the available list, shared queue, or live court to view all their match numbers for this session.
+
+A complete queued group is flagged when those exact four players all played together in their most recent match, regardless of name order. Older repeats and groups with only some returning players are not flagged. Games involving other players on other courts do not affect this check.
+
+**Next Match** asks for confirmation before starting a flagged group. Choose **Review queue** to keep everything unchanged, or **Start anyway** to proceed. Match history stays in memory and clears when the app is quit or another configuration is selected. Leaving and returning to the same session retains a player's history.
+
+## Second-screen display board
+
+1. Connect a monitor or TV to the organizer's laptop and use **extended display** mode, so the screens can show different windows.
+2. Click **Display board** in the organizer's top bar.
+3. Select the connected screen. An external screen is suggested automatically when available.
+4. Leave **Fill selected screen** checked to use its available screen space, then click **Open board**.
+
+The separate, read-only window keeps the logo and **PairFect** branding at the upper left, followed by **PSOQ Family... Let's get playing.** Courts occupy two rows of five above a single row of up to seven queued matches. Available players stay on the right, beneath live counts for checked-in players, available courts, queued matches, and playing courts. Match numbers, skill colors, repeat warnings, and court-start highlights are included. Changes update automatically; searching, changing organizer pages, and opening organizer dialogs do not change the board's contents or bring it to the foreground.
+
+Courts use two rows of five, showing up to 10 without rotation. Only sessions with more than 10 courts rotate court pages every 10 seconds. The queue stays on its first seven matches in one row; later matches remain in the organizer's queue and appear as earlier matches start or the queue is reordered. Available players rotate only when their list cannot fit on screen. The board follows the organizer's light/dark theme. You can move or resize its window, and opening it again reuses the same window.
+
+Press **Esc** while the board is focused, close its window, or use **Display board → Close board** to close only the board. Attendance and matches remain unchanged. Fully closing the organizer also closes the board. If the selected monitor disconnects, the board moves back to a connected screen. With only one screen connected, it opens as a separate window on that screen.
+
+The display board requires the desktop app and runs entirely offline. Screen routing is covered by simulated-monitor tests, and the macOS five-column court layout was checked on a connected 2560 x 1440 monitor. Windows dual-monitor behavior still needs verification on a Windows laptop.
+
 ## Workflow
 
 1. In **Roster & courts**, save players with one of five skill colors and add numbered courts. Court numbers are unique positive whole numbers.
@@ -78,3 +114,9 @@ Saved setup is stored in `setup.json` in Electron's per-user application data di
 The initial build passes match-rule tests including a 100-player, 15-court session. The macOS UI and close confirmation were checked locally. Windows behavior still needs verification on Windows. The dependency audit retains moderate findings in the development-only packaging chain; the Electron runtime was updated to 44.7.0 to resolve the high-severity runtime findings.
 
 For interface-only browser review, run `npm run preview` and open `http://127.0.0.1:5173`. This preview saves setup in browser storage and uses the browser's generic close warning; the custom warning is implemented in the desktop app.
+
+## Troubleshooting saves after an update
+
+If adding a player or court reports **Invalid setup data** after updating the source, fully quit and relaunch the desktop app. On macOS, use **Cmd+Q**; closing the window or reloading it does not restart the desktop save handler. For a source launch, run `npm run dev` again after quitting. For an installed app, install the updated build and reopen it.
+
+Quitting clears the current session after confirmation, but previously saved configurations, players, and courts are kept. The app now displays an explicit restart warning when the window and desktop save handler use different configuration formats.

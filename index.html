@@ -11,7 +11,44 @@
     <div id="app"></div>
     <div id="toast" role="status" aria-live="polite"></div>
     <dialog id="attendance-dialog" aria-labelledby="attendance-title"></dialog>
-    <div id="player-menu" popover role="menu" aria-label="Available player actions">
+    <dialog id="display-settings" aria-labelledby="display-settings-title">
+      <form id="display-settings-form">
+        <div class="dialog-heading"><h2 id="display-settings-title">Display board</h2></div>
+        <p class="hint">A separate, read-only window for your players. Organizer searches and dialogs stay on this laptop.</p>
+        <label class="display-screen-label">Screen<select id="display-screen" name="screenId"></select></label>
+        <label class="display-fill-label"><input type="checkbox" id="display-fill" name="fill" />Fill selected screen</label>
+        <p class="hint">Shows up to 10 courts in two rows of five and the first 7 queued matches in one row. Courts rotate only above 10; available players page only when needed. You can move and resize the board window.</p>
+        <div class="dialog-footer">
+          <button type="button" class="text-button" id="close-display-board">Close board</button>
+          <button type="button" class="button subtle" id="cancel-display-settings">Cancel</button>
+          <button type="submit" class="button dark">Open board</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="configuration-dialog" aria-labelledby="configuration-dialog-title">
+      <form id="configuration-switch-form">
+        <div class="dialog-heading"><h2 id="configuration-dialog-title">Switch configuration?</h2></div>
+        <p class="hint" id="configuration-switch-message"></p>
+        <p class="hint">Today's attendance, the shared queue, active matches, timers, and match history will be cleared. All saved configurations, players, and courts will be kept.</p>
+        <div class="dialog-footer">
+          <button type="button" class="button subtle" id="cancel-configuration-switch">Keep current session</button>
+          <button type="submit" class="button dark">Switch configuration</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="repeat-match-dialog" aria-labelledby="repeat-match-title">
+      <form id="repeat-match-form">
+        <div class="dialog-heading"><h2 id="repeat-match-title">Repeat their last match?</h2></div>
+        <p class="hint" id="repeat-match-message"></p>
+        <p class="hint">You can change the queued group or start this match anyway.</p>
+        <div class="dialog-footer">
+          <button type="button" class="button subtle" id="cancel-repeat-match">Review queue</button>
+          <button type="submit" class="button dark">Start anyway</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="player-menu" popover="manual" role="menu" aria-label="Player actions">
+      <div id="player-history" tabindex="-1"></div>
       <button type="button" role="menuitem" id="remove-attendee">Remove from today's session</button>
     </div>
     <script type="module" src="./src/app.js"></script>
