@@ -1,4 +1,4 @@
-import { LEVELS, uid, createSession, availablePlayers, isLive, isQueued, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, playerMatchHistory, previousRepeatedMatch, startMatch, endMatch, reorderMatch, swapMatches } from './model.js';
+import { LEVELS, uid, romanNumeral, createSession, availablePlayers, isLive, isQueued, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, playerMatchHistory, previousRepeatedMatch, startMatch, endMatch, reorderMatch, swapMatches } from './model.js';
 import { normalizeConfigurations, activeConfiguration, configurationSetup, updateConfigurationSetup, addConfiguration, renameConfiguration, selectConfiguration } from './configurations.js';
 import { createDisplayState } from './display-state.js';
 
@@ -100,8 +100,10 @@ async function requestConfigurationChange(next) {
 function plate(id, draggable = true) {
   const player = playerById(id);
   if (!player) return '';
-  const lastMatch = playerMatchHistory(session, id).at(-1);
-  return `<div class="player ${player.level}" tabindex="0" ${draggable ? 'draggable="true"' : ''} data-player="${esc(id)}" title="${esc(player.name)} · Right-click for match history"><span class="skill-dot"></span><span class="player-name">${esc(player.name)}</span>${lastMatch ? `<span class="player-match-number" title="Most recent match: ${lastMatch.number}" aria-label="Most recent match ${lastMatch.number}">#${lastMatch.number}</span>` : ''}${draggable ? '<span class="grip" aria-hidden="true">⠿</span>' : ''}</div>`;
+  const history = playerMatchHistory(session, id);
+  const lastMatch = history.at(-1);
+  const matchCountLabel = `${history.length} ${history.length === 1 ? 'match' : 'matches'} played this session`;
+  return `<div class="player ${player.level}" tabindex="0" ${draggable ? 'draggable="true"' : ''} data-player="${esc(id)}" title="${esc(player.name)} · Right-click for match history"><span class="skill-dot"></span><span class="player-name">${esc(player.name)}</span>${lastMatch ? `<span class="player-match-number" title="Most recent match: ${lastMatch.number} · ${matchCountLabel}" aria-label="Most recent match ${lastMatch.number}, ${matchCountLabel}">${romanNumeral(history.length)} · #${lastMatch.number}</span>` : ''}${draggable ? '<span class="grip" aria-hidden="true">⠿</span>' : ''}</div>`;
 }
 
 function publishDisplayState() {
@@ -278,7 +280,9 @@ root.addEventListener('submit', async event => {
   } else if (form.id === 'add-player' || form.dataset.editPlayer) {
     const name = String(data.get('name')).trim(), level = data.get('level');
     if (!name) return toast('Enter a player name.', true);
-    if (form.id === 'add-player') await saveSetup({ ...setup, players: [...setup.players, { id: uid(), name, level }] });
+    if (form.id === 'add-player') {
+      if (await saveSetup({ ...setup, players: [{ id: uid(), name, level }, ...setup.players] })) toast(`${name} has been successfully added!`);
+    }
     else await saveSetup({ ...setup, players: setup.players.map(player => player.id === form.dataset.editPlayer ? { ...player, name, level } : player) });
   } else if (form.id === 'add-court' || form.dataset.editCourt) {
     const raw = String(data.get('number')), number = Number(raw);

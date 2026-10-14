@@ -1,3 +1,4 @@
+import { romanNumeral } from './model.js';
 import { displayStats, displayMatchPages } from './display-state.js';
 
 const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -6,7 +7,7 @@ const pages = { court: 0, queue: 0 };
 const grids = Object.fromEntries(Object.keys(pages).map(key => [key, document.querySelector(`#${key}-grid`)]));
 
 function plate(player) {
-  return player ? `<div class="nameplate ${esc(player.level)}"><strong>${esc(player.name)}</strong>${player.lastMatchNumber ? `<small class="match-number">#${player.lastMatchNumber}</small>` : ''}</div>` : '<div class="empty-slot">Waiting for players</div>';
+  return player ? `<div class="nameplate ${esc(player.level)}"><strong>${esc(player.name)}</strong>${player.matchesPlayed ? `<small class="match-number" title="${player.matchesPlayed} ${player.matchesPlayed === 1 ? 'match' : 'matches'} played this session" aria-label="${player.matchesPlayed} ${player.matchesPlayed === 1 ? 'match' : 'matches'} played this session">${romanNumeral(player.matchesPlayed)}</small>` : ''}</div>` : '<div class="empty-slot">Waiting for players</div>';
 }
 
 function render() {

@@ -46,6 +46,22 @@ test('board snapshots carry repeat warnings and are independent of future sessio
   assert.equal(state.queue[0].players[0].name, 'D');
 });
 
+test('display match counts follow each player through queued, live, and fresh sessions', () => {
+  const { setup, session } = fixture();
+  const snapshot = () => createDisplayState(setup, session, 'Club', 'light');
+  assert.equal(snapshot().queue[0].players[0].matchesPlayed, 0);
+  startMatch(session, 'court-1', 1000);
+  assert.equal(snapshot().courts[0].players[0].matchesPlayed, 1);
+  endMatch(session, 'court-1', 2000);
+  session.queue.push({ id: 'second', players: ['a', 'b', 'c', 'e'] });
+  assert.deepEqual(snapshot().queue[0].players.map(player => player.matchesPlayed), [1, 1, 1, 0]);
+  startMatch(session, 'court-1', 3000);
+  assert.deepEqual(snapshot().courts[0].players.map(player => player.matchesPlayed), [2, 2, 2, 1]);
+  Object.assign(session, createSession());
+  session.queue.push({ id: 'fresh', players: ['a', null, null, null] });
+  assert.equal(snapshot().queue[0].players[0].matchesPlayed, 0);
+});
+
 test('pagination covers 100 players without omitting the final page', () => {
   const players = Array.from({ length: 100 }, (_, index) => index);
   const pages = Array.from({ length: 6 }, (_, index) => pageItems(players, index, 18));

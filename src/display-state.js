@@ -5,7 +5,8 @@ export function createDisplayState(setup, session, configurationName, theme) {
   const player = id => {
     const saved = byId.get(id);
     if (!saved) return null;
-    return { id: saved.id, name: saved.name, level: saved.level, lastMatchNumber: playerMatchHistory(session, id).at(-1)?.number || null };
+    const history = playerMatchHistory(session, id);
+    return { id: saved.id, name: saved.name, level: saved.level, lastMatchNumber: history.at(-1)?.number || null, matchesPlayed: history.length };
   };
   return {
     configurationName, theme, attendingCount: session.attending.length,

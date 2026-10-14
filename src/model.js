@@ -107,3 +107,11 @@ export function reorderMatch(session, matchId, beforeId) {
   const to = beforeId === null ? session.queue.length : session.queue.findIndex(item => item.id === beforeId);
   session.queue.splice(to, 0, match);
 }
+
+export function romanNumeral(count) {
+  let numeral = '';
+  for (const [value, symbol] of [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']]) {
+    while (count >= value) { numeral += symbol; count -= value; }
+  }
+  return numeral;
+}
