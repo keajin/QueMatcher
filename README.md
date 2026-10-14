@@ -44,7 +44,7 @@ The installed app works entirely offline without accounts or external services. 
 - The sidebar and theme preferences are remembered locally between launches.
 - Courts and queued matches use matching vertical cards named **Court 1**, **Queue 1**, and so on, with four players listed in one column. Queue numbers reflect the current order.
 - Player name plates use solid skill colors and larger, bold names. Long names wrap to stay readable.
-- A court lights up for **10 seconds** when a match starts, then returns to its normal playing appearance.
+- A court lights up for **30 seconds** when a match starts, then fades back to its normal playing appearance over **1.5 seconds**. Reduced-motion preferences disable the fade.
 
 ## Saved configurations
 

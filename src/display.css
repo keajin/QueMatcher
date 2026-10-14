@@ -16,7 +16,7 @@ header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) min
 .display-brand small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 500; letter-spacing: 2px; }
 .brand-logo { display: block; flex-shrink: 0; width: 64px; height: 64px; object-fit: contain; border-radius: 50%; background: #000; }
 #configuration-name { font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
-.live-indicator { justify-self: end; font-size: 12px; letter-spacing: 1.5px; white-space: nowrap; color: var(--muted); }
+.display-clock { justify-self: end; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); }
 .display-layout { flex: 1; min-height: 0; display: flex; padding: 20px 28px; }
 .match-board { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 2fr) minmax(0, 1fr); gap: 20px; }
 .board-intro { display: flex; align-items: center; justify-content: space-between; gap: 32px; }
@@ -52,10 +52,13 @@ header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) min
 .card-heading > .timer { flex-shrink: 0; font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: 0; color: var(--ink); }
 .queue-note { flex-shrink: 0; margin-top: 6px; border-top: 1px solid var(--line); padding-top: 4px; font-size: 12px; color: var(--queue-ink); }
 .just-started { background: var(--highlight); border-color: var(--glow); box-shadow: 0 0 16px color-mix(in srgb, var(--glow) 40%, transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  .court-card { transition: background-color 1.5s ease-out, border-color 1.5s ease-out, box-shadow 1.5s ease-out; }
+}
 .empty-zone { grid-column: 1 / -1; display: grid; place-items: center; padding: 20px; border: 1px dashed var(--line); border-radius: 9px; font-size: 18px; color: var(--muted); text-align: center; }
 footer { display: flex; justify-content: space-between; gap: 16px; padding: 11px 28px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
 @media (min-width: 2000px) { .display-brand { font-size: 38px; } }
-@media (max-width: 1200px) { .display-layout { padding-inline: 18px; } .board-intro { gap: 18px; } .board-stats { flex-basis: 600px; gap: 8px; } .board-stats > div { padding-inline: 10px; } .board-stats span { font-size: 11px; } .zone-heading h2 { font-size: 20px; } .live-indicator { display: none; } }
+@media (max-width: 1200px) { .display-layout { padding-inline: 18px; } .board-intro { gap: 18px; } .board-stats { flex-basis: 600px; gap: 8px; } .board-stats > div { padding-inline: 10px; } .board-stats span { font-size: 11px; } .zone-heading h2 { font-size: 20px; } }
 @media (max-height: 1100px) {
   header { padding-block: 10px; } .brand-logo { width: 48px; height: 48px; }
   .display-layout { padding-block: 12px; } .match-board { gap: 12px; }

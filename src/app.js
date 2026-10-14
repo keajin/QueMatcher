@@ -182,7 +182,7 @@ function configurationPanel() {
 function renderCourts() {
   return [...setup.courts].sort((a, b) => a.number - b.number).map(court => {
     const live = session.live[court.id];
-    const highlightUntil = live ? live.startedAt + 10000 : 0;
+    const highlightUntil = live ? live.startedAt + 30000 : 0;
     return `<article class="match-card court ${live ? 'playing' : ''} ${Date.now() < highlightUntil ? 'just-started' : ''}" ${live ? `data-highlight-until="${highlightUntil}"` : ''}>
       <div class="card-heading"><h3>Court ${court.number}</h3><span class="status ${live ? 'on' : ''}">${live ? 'PLAYING' : 'OPEN'}</span></div>
       <div class="card-meta">${live ? `Match #${live.number} in progress` : 'Ready for the next group'}</div>
@@ -248,7 +248,7 @@ root.addEventListener('click', async event => {
         return;
       }
       startMatch(session, button.dataset.court);
-      setTimeout(updateCourtTimers, 10000);
+      setTimeout(updateCourtTimers, 30000);
     }
     else if (action === 'end') endMatch(session, button.dataset.court);
     else if (action === 'move-up' || action === 'move-down') {
@@ -371,7 +371,10 @@ root.addEventListener('drop', event => {
   finally { root.classList.remove('dragging-player', 'dragging-match'); document.querySelectorAll('.drop-hover').forEach(element => element.classList.remove('drop-hover')); }
 });
 
-root.addEventListener('dblclick', event => {
+root.addEventListener('click', event => {
+  // Native dblclick only covers the second click. Rapid clicks in the same
+  // position can keep counting after a new player moves under the cursor.
+  if (event.button !== 0 || event.detail < 2 || event.detail % 2 !== 0) return;
   const player = event.target.closest('[data-player][draggable]');
   if (!player?.closest('[data-drop-available]')) return;
   try { queueAvailablePlayer(session, player.dataset.player); selectedPlayer = null; render(); }
@@ -407,7 +410,7 @@ document.querySelector('#repeat-match-form').addEventListener('submit', event =>
     startMatch(session, pendingRepeatMatch.courtId, Date.now(), { allowRepeat: true, expectedMatchId: pendingRepeatMatch.matchId, expectedPlayers: pendingRepeatMatch.players });
     repeatMatchDialog.close();
     render();
-    setTimeout(updateCourtTimers, 10000);
+    setTimeout(updateCourtTimers, 30000);
   } catch (error) { repeatMatchDialog.close(); toast(error.message, true); }
 });
 
