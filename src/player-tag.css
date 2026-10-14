@@ -1,0 +1,9 @@
+:root {
+  --tag-radius: 7px;
+  --tag-border-width: 2px;
+  --tag-min-height: 50px;
+  --tag-padding-block: 11px;
+  --tag-padding-inline: 12px;
+  --tag-gap: 9px;
+  --tag-line-height: 1.35;
+}

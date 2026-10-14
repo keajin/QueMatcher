@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'" />
     <title>QueMatcher</title>
+    <link rel="stylesheet" href="./src/player-tag.css" />
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
@@ -17,7 +18,7 @@
         <p class="hint">A separate, read-only window for your players. Organizer searches and dialogs stay on this laptop.</p>
         <label class="display-screen-label">Screen<select id="display-screen" name="screenId"></select></label>
         <label class="display-fill-label"><input type="checkbox" id="display-fill" name="fill" />Fill selected screen</label>
-        <p class="hint">Shows up to 10 courts in two rows of five and the first 7 queued matches in one row. Courts rotate only above 10; available players page only when needed. You can move and resize the board window.</p>
+        <p class="hint">Shows up to 10 courts in two rows of five and the first 7 queued matches in one row. Courts rotate only above 10. Session stats appear beside the heading; available players stay on the organizer's screen only.</p>
         <div class="dialog-footer">
           <button type="button" class="text-button" id="close-display-board">Close board</button>
           <button type="button" class="button subtle" id="cancel-display-settings">Cancel</button>

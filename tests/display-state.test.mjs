@@ -14,7 +14,7 @@ function fixture() {
   return { setup, session };
 }
 
-test('the board projects live courts, queue, and only available attendees', () => {
+test('the board projects live courts and queue without publishing available players', () => {
   const { setup, session } = fixture();
   startMatch(session, 'court-2', 1000);
   const state = createDisplayState(setup, session, 'Friday', 'dark');
@@ -22,7 +22,9 @@ test('the board projects live courts, queue, and only available attendees', () =
   assert.equal(state.courts[1].matchNumber, 1);
   assert.equal(state.courts[1].startedAt, 1000);
   assert.equal(state.courts[1].players[0].lastMatchNumber, 1);
-  assert.deepEqual(state.available.map(player => player.id), ['e']);
+  assert.equal('available' in state, false);
+  assert.equal(JSON.stringify(state).includes('"E"'), false);
+  assert.equal(JSON.stringify(state).includes('"ABSENT"'), false);
   assert.deepEqual(state.queue, []);
   assert.equal(state.configurationName, 'Friday');
   assert.equal(state.theme, 'dark');

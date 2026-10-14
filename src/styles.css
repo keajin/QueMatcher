@@ -147,10 +147,10 @@ input::placeholder { color: var(--muted); opacity: 1; }
 .red { --skill: var(--red); }
 .skill-dot { flex-shrink: 0; display: inline-block; width: 10px; height: 10px; background: var(--skill); border-radius: 50%; }
 .player-list { display: grid; align-content: start; gap: 8px; max-height: max(200px, calc(100vh - 400px)); min-height: 180px; overflow: auto; padding: 3px; }
-.player { display: flex; align-items: center; gap: 9px; padding: 11px 12px; border-radius: 7px; background: var(--skill); color: #fff; border: 2px solid var(--skill); font-size: 17px; min-height: 50px; min-width: 0; }
+.player { display: flex; align-items: center; gap: var(--tag-gap); padding: var(--tag-padding-block) var(--tag-padding-inline); border-radius: var(--tag-radius); background: var(--skill); color: #fff; border: var(--tag-border-width) solid var(--skill); font-size: 17px; min-height: var(--tag-min-height); min-width: 0; }
 .player.orange { color: #301e08; }
 .player[draggable] { cursor: grab; }
-.player-name { white-space: normal; overflow-wrap: anywhere; flex: 1; font-weight: 700; line-height: 1.35; }
+.player-name { white-space: normal; overflow-wrap: anywhere; flex: 1; font-weight: 700; line-height: var(--tag-line-height); }
 .player-match-number { flex-shrink: 0; font-size: 12px; font-weight: 700; padding: 3px 6px; border: 1px solid currentColor; border-radius: 5px; font-variant-numeric: tabular-nums; }
 .player .skill-dot { display: none; }
 .grip { color: inherit; opacity: .75; }

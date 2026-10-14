@@ -1,4 +1,4 @@
-import { availablePlayers, playerMatchHistory, previousRepeatedMatch } from './model.js';
+import { playerMatchHistory, previousRepeatedMatch } from './model.js';
 
 export function createDisplayState(setup, session, configurationName, theme) {
   const byId = new Map(setup.players.map(player => [player.id, player]));
@@ -13,8 +13,7 @@ export function createDisplayState(setup, session, configurationName, theme) {
       const live = session.live[court.id];
       return { id: court.id, number: court.number, players: live ? live.players.map(player) : [null, null, null, null], matchNumber: live?.number || null, startedAt: live?.startedAt ?? null };
     }),
-    queue: session.queue.map((match, index) => ({ id: match.id, position: index + 1, players: match.players.map(player), repeatMatchNumber: previousRepeatedMatch(session, match.players)?.number || null })),
-    available: availablePlayers(session).map(player).filter(Boolean)
+    queue: session.queue.map((match, index) => ({ id: match.id, position: index + 1, players: match.players.map(player), repeatMatchNumber: previousRepeatedMatch(session, match.players)?.number || null }))
   };
 }
 
