@@ -21,7 +21,7 @@
   "build": {
     "appId": "com.quematcher.desktop",
     "productName": "QueMatcher",
-    "files": ["index.html", "display.html", "src/**/*", "desktop/**/*", "package.json"],
+    "files": ["index.html", "display.html", "PSOQ_Logo.jpg", "src/**/*", "desktop/**/*", "package.json"],
     "directories": { "output": "release" },
     "mac": { "target": ["dmg"], "category": "public.app-category.sports" },
     "win": { "target": ["nsis"] },

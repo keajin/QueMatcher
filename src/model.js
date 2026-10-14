@@ -91,6 +91,14 @@ export function endMatch(session, courtId, now = Date.now()) {
   delete session.live[courtId];
 }
 
+export function swapMatches(session, matchId, targetId) {
+  if (matchId === targetId) return;
+  const from = session.queue.findIndex(match => match.id === matchId);
+  const to = session.queue.findIndex(match => match.id === targetId);
+  if (from < 0 || to < 0) return;
+  [session.queue[from], session.queue[to]] = [session.queue[to], session.queue[from]];
+}
+
 export function reorderMatch(session, matchId, beforeId) {
   if (matchId === beforeId) return;
   const from = session.queue.findIndex(match => match.id === matchId);

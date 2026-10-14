@@ -1,4 +1,4 @@
-import { LEVELS, uid, createSession, availablePlayers, isLive, isQueued, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, playerMatchHistory, previousRepeatedMatch, startMatch, endMatch, reorderMatch } from './model.js';
+import { LEVELS, uid, createSession, availablePlayers, isLive, isQueued, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, playerMatchHistory, previousRepeatedMatch, startMatch, endMatch, reorderMatch, swapMatches } from './model.js';
 import { normalizeConfigurations, activeConfiguration, configurationSetup, updateConfigurationSetup, addConfiguration, renameConfiguration, selectConfiguration } from './configurations.js';
 import { createDisplayState } from './display-state.js';
 
@@ -153,7 +153,7 @@ function clock(start) {
 function renderSidebar() {
   return `<aside class="sidebar" id="sidebar">
     <button class="sidebar-toggle" data-action="toggle-sidebar" aria-controls="sidebar" aria-expanded="${!sidebarCollapsed}" aria-label="${sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar" title="${sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar"><span aria-hidden="true">${sidebarCollapsed ? '›' : '‹'}</span><span class="nav-text">Collapse sidebar</span></button>
-    <a class="brand" href="#" data-action="session" aria-label="QueMatcher session board"><span class="brand-mark">Q<span></span></span><span class="brand-text">PairFect<small>SMASHERS OF QATAR</small></span></a>
+    <a class="brand" href="#" data-action="session" aria-label="QueMatcher session board"><img class="brand-logo" src="./PSOQ_Logo.jpg" alt="PSOQ logo" /><span class="brand-text">PairFect<small>SMASHERS OF QATAR</small></span></a>
     <div class="nav-label">YOUR STADIUM</div>
     <nav><button data-action="session" title="Session board" aria-label="Session board" class="nav-button ${page === 'session' ? 'selected' : ''}"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Session board</span></button><button data-action="setup" title="Roster & courts" aria-label="Roster and courts" class="nav-button ${page === 'setup' ? 'selected' : ''}"><span class="nav-icon" aria-hidden="true">☷</span><span class="nav-text">Roster & courts</span></button></nav>
     <div class="sidebar-bottom"><span class="offline-dot"></span><span class="nav-text">For PSOQ<small>All seasons use</small></span></div>
@@ -194,8 +194,8 @@ function renderQueue() {
   return session.queue.map((match, index) => {
     const count = match.players.filter(Boolean).length;
     const repeat = previousRepeatedMatch(session, match.players);
-    return `<article class="match-card queued-match ${repeat ? 'repeat-match' : ''}" data-queue-match="${esc(match.id)}">
-      <div class="card-heading"><h3><span class="match-handle" draggable="true" data-drag-match="${esc(match.id)}" title="Drag to reorder Queue ${index + 1}" aria-hidden="true">⠿</span>Queue ${index + 1}</h3><span class="status ${count === 4 ? 'on' : ''}">${count}/4 ${count === 4 ? 'READY' : 'PLAYERS'}</span></div>
+    return `<article class="match-card queued-match ${repeat ? 'repeat-match' : ''}" draggable="true" data-drag-match="${esc(match.id)}" data-queue-match="${esc(match.id)}" title="Drag this card to reorder Queue ${index + 1}">
+      <div class="card-heading"><h3><span class="match-handle" aria-hidden="true">⠿</span>Queue ${index + 1}</h3><span class="status ${count === 4 ? 'on' : ''}">${count}/4 ${count === 4 ? 'READY' : 'PLAYERS'}</span></div>
       <div class="card-meta">${index === 0 ? 'Next on an available court' : 'Waiting in the shared queue'}</div>
       ${repeat ? `<p class="repeat-warning" role="status">Repeats their last match (#${repeat.number})</p>` : ''}
       <div class="match-players">${slots(match.players, false, match.id)}</div>
@@ -208,7 +208,7 @@ function render() {
   playerMenu.hidePopover();
   const available = availablePlayers(session);
   const playingCount = Object.keys(session.live).length;
-  root.innerHTML = `${renderSidebar()}<main>${renderTopbar()}${page === 'session' ? `<section class="page-heading"><div><div class="eyebrow">PSOQ FAMILY...</div><h1>Let’s get playing.</h1></div><button class="button dark" data-action="attendance">Select attendance <span>↗</span></button></section><div class="stats"><div><strong>${session.attending.length}</strong><span>checked in</span></div><div><strong>${available.length}</strong><span>available</span></div><div><strong>${session.queue.length}</strong><span>queued matches</span></div><div><strong>${playingCount}<small> / ${setup.courts.length}</small></strong><span>courts playing</span></div></div><div class="workspace"><section class="available-panel" data-drop-available><div class="section-title"><h2>Available players</h2><span class="count">${available.length}</span></div><p class="hint">Drag a name into a queued match.</p><label class="search-label"><span>⌕</span><input id="player-search" type="search" placeholder="Find a player…" value="${esc(search)}" aria-label="Find an available player" /></label><div class="filters"><button data-filter="all" class="${levelFilter === 'all' ? 'active' : ''}">All</button>${LEVELS.map(level => `<button class="filter-dot ${level} ${levelFilter === level ? 'active' : ''}" data-filter="${level}" aria-label="Filter ${level} players" title="${level}"></button>`).join('')}</div><div class="player-list">${available.filter(id => { const player = playerById(id); return player && player.name.toLowerCase().includes(search.toLowerCase()) && (levelFilter === 'all' || player.level === levelFilter); }).map(id => plate(id)).join('') || `<div class="empty-list"><span>＋</span><strong>${session.attending.length ? 'No matching players' : 'Who’s playing today?'}</strong><p>${session.attending.length ? 'Players return here after their match.' : 'Select attendance from your saved roster to get started.'}</p>${!session.attending.length ? '<button class="button subtle" data-action="attendance">Select players</button>' : ''}</div>`}</div><div class="return-zone">Drop here to return a queued player</div></section><div class="board"><section><div class="section-title"><div><h2>Live courts <span class="count">${setup.courts.length}</span></h2><p class="hint">Take the next match when a court is ready.</p></div><button class="text-button" data-action="setup">Manage courts ↗</button></div><div class="courts">${renderCourts()}</div></section><section class="queue-section"><div class="section-title"><div><h2>Shared queue <span class="count">${session.queue.length}</span></h2><p class="hint">One shared queue. Drag the handle to change the order.</p></div><button class="button dark" data-action="add-match">＋ Add Match</button></div><div class="queue">${renderQueue()}<div class="queue-end" data-drop-end>Drag a match here to move it to the end</div></div></section></div></div>` : setupPage()}</main>`;
+  root.innerHTML = `${renderSidebar()}<main>${renderTopbar()}${page === 'session' ? `<section class="page-heading"><div><div class="eyebrow">PSOQ FAMILY...</div><h1>Let’s get playing.</h1></div><button class="button dark" data-action="attendance">Select attendance <span>↗</span></button></section><div class="stats"><div><strong>${session.attending.length}</strong><span>checked in</span></div><div><strong>${available.length}</strong><span>available</span></div><div><strong>${session.queue.length}</strong><span>queued matches</span></div><div><strong>${playingCount}<small> / ${setup.courts.length}</small></strong><span>courts playing</span></div></div><div class="workspace"><section class="available-panel" data-drop-available><div class="section-title"><h2>Available players</h2><span class="count">${available.length}</span></div><p class="hint">Drag a name into a queued match.</p><label class="search-label"><span>⌕</span><input id="player-search" type="search" placeholder="Find a player…" value="${esc(search)}" aria-label="Find an available player" /></label><div class="filters"><button data-filter="all" class="${levelFilter === 'all' ? 'active' : ''}">All</button>${LEVELS.map(level => `<button class="filter-dot ${level} ${levelFilter === level ? 'active' : ''}" data-filter="${level}" aria-label="Filter ${level} players" title="${level}"></button>`).join('')}</div><div class="player-list">${available.filter(id => { const player = playerById(id); return player && player.name.toLowerCase().includes(search.toLowerCase()) && (levelFilter === 'all' || player.level === levelFilter); }).map(id => plate(id)).join('') || `<div class="empty-list"><span>＋</span><strong>${session.attending.length ? 'No matching players' : 'Who’s playing today?'}</strong><p>${session.attending.length ? 'Players return here after their match.' : 'Select attendance from your saved roster to get started.'}</p>${!session.attending.length ? '<button class="button subtle" data-action="attendance">Select players</button>' : ''}</div>`}</div><div class="return-zone">Drop here to return a queued player</div></section><div class="board"><section><div class="section-title"><div><h2>Live courts <span class="count">${setup.courts.length}</span></h2><p class="hint">Take the next match when a court is ready.</p></div><button class="text-button" data-action="setup">Manage courts ↗</button></div><div class="courts">${renderCourts()}</div></section><section class="queue-section"><div class="section-title"><div><h2>Shared queue <span class="count">${session.queue.length}</span></h2><p class="hint">Drop a card onto another to swap matches. Drag a name to move a player.</p></div><button class="button dark" data-action="add-match">＋ Add Match</button></div><div class="queue">${renderQueue()}<div class="queue-end" data-drop-end>Drag a match here to move it to the end</div></div></section></div></div>` : setupPage()}</main>`;
   publishDisplayState();
 }
 
@@ -321,7 +321,13 @@ document.querySelector('#configuration-switch-form').addEventListener('submit', 
   finally { buttons.forEach(button => button.disabled = false); }
 });
 
+let dragStartedOnControl = false;
+root.addEventListener('pointerdown', event => {
+  dragStartedOnControl = Boolean(event.target.closest('button, input, select, a'));
+});
+
 root.addEventListener('dragstart', event => {
+  if (dragStartedOnControl) { event.preventDefault(); return; }
   playerMenu.hidePopover();
   const player = event.target.closest('[data-player][draggable]');
   const match = event.target.closest('[data-drag-match]');
@@ -353,7 +359,8 @@ root.addEventListener('drop', event => {
     } else if (payload.type === 'match') {
       const target = event.target.closest('[data-queue-match], [data-drop-end]');
       if (!target) return;
-      reorderMatch(session, payload.id, target.dataset.queueMatch || null);
+      if (target.dataset.queueMatch) swapMatches(session, payload.id, target.dataset.queueMatch);
+      else reorderMatch(session, payload.id, null);
     }
     render();
   } catch (error) { toast(error.message, true); }

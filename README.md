@@ -87,7 +87,7 @@ The display board requires the desktop app and runs entirely offline. Screen rou
 1. In **Roster & courts**, save players with one of five skill colors and add numbered courts. Court numbers are unique positive whole numbers.
 2. On **Session board**, use **Select attendance** to check in today's players.
 3. **Add Match** creates four empty queue slots. Drag a player anywhere onto a queue card to fill its first empty slot from the top. Moving a player removes their previous assignment. Full cards reject drops without replacing anyone.
-4. Drag a match's handle to reorder the shared queue. Move up/down buttons also change the order.
+4. Drag a queued match card onto another card to swap their positions. Other matches keep their positions, and each group's players stay together. Dragging onto the end zone still moves a match to the end. Player tags still drag individually, and Move up/down buttons also change the order.
 5. An empty court's **Next Match** starts the first queued group only when it has four players. The timer starts immediately.
 6. Live players cannot be moved. **End Match** returns them to the available list.
 7. Closing the desktop window asks for confirmation. Only roster and court settings are saved; attendance, queue, and live matches are cleared.

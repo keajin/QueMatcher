@@ -76,8 +76,8 @@ h1, h2, h3, p { margin: 0; }
 .sidebar-toggle > span:first-child { font-size: 25px; line-height: 1; }
 .brand { display: flex; gap: 10px; align-items: center; color: inherit; text-decoration: none; font-size: 22px; font-weight: 700; letter-spacing: -.7px; }
 .brand small { display: block; font-size: 9px; letter-spacing: 1.7px; font-weight: 400; color: var(--sidebar-muted); margin-top: 4px; }
-.brand-mark { position: relative; display: grid; flex-shrink: 0; place-items: center; background: #e4f2a2; color: #193a2f; width: 39px; height: 43px; border-radius: 12px; font-size: 29px; font-family: Georgia, serif; font-style: italic; }
-.brand-mark span { position: absolute; width: 5px; height: 14px; background: #193a2f; right: 7px; bottom: 5px; transform: rotate(-35deg); border-radius: 3px; }
+.brand-logo { display: block; flex-shrink: 0; width: 48px; height: 48px; object-fit: contain; border-radius: 50%; background: #000; }
+.sidebar-collapsed .brand-logo { width: 44px; height: 44px; }
 .nav-label { font-size: 10px; letter-spacing: 1.5px; color: var(--sidebar-muted); margin: 42px 8px 16px; }
 nav { display: grid; gap: 10px; }
 .nav-button { display: flex; align-items: center; gap: 11px; border: 0; background: transparent; color: var(--sidebar-muted); padding: 14px 10px; border-radius: 9px; text-align: left; font-size: 15px; }
@@ -160,7 +160,8 @@ input::placeholder { color: var(--muted); opacity: 1; }
 .courts, .queue { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(245px, 100%), 1fr)); gap: 16px; align-items: stretch; }
 .match-card { min-width: 0; min-height: 378px; background: var(--surface); border: 2px solid var(--line); border-radius: 12px; padding: 17px; display: flex; flex-direction: column; }
 .court.playing { border-color: var(--accent); }
-.queued-match { background: var(--queue-surface); border-color: var(--queue-border); }
+.queued-match { background: var(--queue-surface); border-color: var(--queue-border); cursor: grab; user-select: none; }
+.queued-match:active { cursor: grabbing; }
 .queued-match .card-heading h3, .queued-match .card-meta, .queued-match .match-handle { color: var(--queue-accent); }
 .queued-match .slot:not(.filled) { background: color-mix(in srgb, var(--queue-surface) 65%, var(--surface)); border-color: var(--queue-border); }
 .queued-match .card-footer { border-color: var(--queue-border); }
@@ -264,6 +265,7 @@ dialog::backdrop { background: #152b2466; backdrop-filter: blur(3px); }
 @media (max-width: 1200px) {
   :root:not(.sidebar-collapsed) { --sidebar-width: 215px; }
   .brand { font-size: 19px; }
+  .brand-logo { width: 40px; height: 40px; }
   .sidebar { padding-inline: 14px; }
   main { padding-inline: 22px; }
   .workspace { grid-template-columns: 235px minmax(0, 1fr); gap: 18px; }

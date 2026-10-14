@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSession, availablePlayers, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, startMatch, endMatch, reorderMatch, normalizeSetup } from '../src/model.js';
+import { createSession, availablePlayers, movePlayer, addPlayerToMatch, queueAvailablePlayer, removeAvailablePlayer, startMatch, endMatch, reorderMatch, swapMatches, normalizeSetup } from '../src/model.js';
 
 function fixture() {
   const session = createSession();
@@ -108,6 +108,25 @@ test('reordering moves whole groups and leaves player slots intact', () => {
   reorderMatch(session, 'first', null);
   assert.deepEqual(session.queue.map(match => match.id), ['second', 'first']);
   assert.deepEqual(session.queue[1].players, ['a', 'b', 'c', 'd']);
+});
+
+test('card drops swap nonadjacent matches in either direction without shifting other groups', () => {
+  const session = fixture();
+  session.queue.push({ id: 'third', players: ['e', null, null, null] }, { id: 'fourth', players: [null, null, null, null] });
+  const original = structuredClone(session.queue);
+  swapMatches(session, 'first', 'fourth');
+  assert.deepEqual(session.queue, [original[3], original[1], original[2], original[0]]);
+  swapMatches(session, 'first', 'fourth');
+  assert.deepEqual(session.queue, original);
+});
+
+test('dropping onto the same or a missing card leaves the queue unchanged', () => {
+  const session = fixture();
+  const before = structuredClone(session);
+  swapMatches(session, 'first', 'first');
+  swapMatches(session, 'first', 'missing');
+  swapMatches(session, 'missing', 'second');
+  assert.deepEqual(session, before);
 });
 
 test('saved setup excludes session data and rejects duplicate or invalid court numbers', () => {
